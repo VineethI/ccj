@@ -1,62 +1,110 @@
 import { StarBorderOutlined } from "@material-ui/icons";
 import InfoOutlinedIcon from "@material-ui/icons/InfoOutlined";
-import React, {useRef, useEffect} from "react";
+import React, { useRef, useEffect } from "react";
 import styled from "styled-components";
 import { useSelector } from "react-redux";
 import { selectRoomId } from "../features/appSlice";
-import ChatInput from './ChatInput'
-import {db} from '../firebase'
-import {useCollection} from 'react-firebase-hooks/firestore'
-import Message from './Message'
+import ChatInput from "./ChatInput";
+import { db } from "../firebase";
+import { useCollection } from "react-firebase-hooks/firestore";
+import Message from "./Message";
+import CryptoJS from "crypto-js";
 
 function Chat() {
-
-    const chatRef = useRef(null)
+  const chatRef = useRef(null);
 
   const roomId = useSelector(selectRoomId);
 
   const [roomDetails] = useCollection(
-      roomId && db.collection('rooms').doc(roomId)
-  )
+    roomId && db.collection("rooms").doc(roomId)
+  );
 
   const [roomMessages, loading] = useCollection(
-      roomId && db.collection('rooms').doc(roomId).collection('messages').orderBy('timestamp', "asc")
-  )
+    roomId &&
+      db
+        .collection("rooms")
+        .doc(roomId)
+        .collection("messages")
+        .orderBy("timestamp", "asc")
+  );
 
   useEffect(() => {
-     chatRef?.current?.scrollIntoView()
-  }, [roomId, loading])
+    chatRef?.current?.scrollIntoView();
+  }, [roomId, loading]);
 
   return (
     <ChatContainer>
-        {roomDetails && roomMessages && (
-            <>
-            <Header>
-              <HeaderLeft>
-                <h4>
-                  <strong>#{roomDetails?.data().name}</strong>
-                </h4>
-                <StarBorderOutlined />
-              </HeaderLeft>
-              <HeaderRight>
-                <p>
-                  <InfoOutlinedIcon />
-                  Details
-                </p>
-              </HeaderRight>
-            </Header>
-            <ChatMessages>
-                {roomMessages?.docs.map(doc => {
-                    const {message, timestamp, user, userImage} = doc.data()
-                    return (
-                        <Message key={doc.id} message={message} timestamp={timestamp} user={user} userImage={userImage}/>
-                    )
-                })}
-                <ChatBottom ref={chatRef}/>
-            </ChatMessages>
-            <ChatInput chatRef={chatRef} channelName={roomDetails?.data().name} channelId={roomId} />
-          </>
-        )}
+      {roomDetails && roomMessages && (
+        <>
+          <Header>
+            <HeaderLeft>
+              <h4>
+                <strong>#{roomDetails?.data().name}</strong>
+              </h4>
+              <StarBorderOutlined />
+            </HeaderLeft>
+            <HeaderRight>
+              <p>
+                <InfoOutlinedIcon />
+                Details
+              </p>
+            </HeaderRight>
+          </Header>
+          <ChatMessages>
+            {roomMessages?.docs.map((doc) => {
+              const { message, timestamp, user, userImage } = doc.data();
+              console.log(message, "message")
+              const encrypted = CryptoJS.enc.Base64.parse(
+                message
+              );
+
+              console.log(encrypted)
+
+              const salt_len = 16
+              const iv_len = 16;
+
+              const salt = CryptoJS.lib.WordArray.create(
+                encrypted.words.slice(0, salt_len / 4)
+              );
+              const iv = CryptoJS.lib.WordArray.create(
+                encrypted.words.slice(0 + salt_len / 4, (salt_len + iv_len) / 4)
+              );
+
+              const key = CryptoJS.PBKDF2("secret message", salt, {
+                keySize: 256 / 32,
+                iterations: 10000,
+                hasher: CryptoJS.algo.SHA256,
+              });
+
+              const decrypted = CryptoJS.AES.decrypt(
+                {
+                  ciphertext: CryptoJS.lib.WordArray.create(
+                    encrypted.words.slice((salt_len + iv_len) / 4)
+                  ),
+                },
+                key,
+                { iv: iv }
+              );
+              console.log(decrypted.toString(CryptoJS.enc.Utf8));
+              return (
+                <Message
+                  key={doc.id}
+                  message={decrypted.toString(CryptoJS.enc.Utf8)}
+                  timestamp={timestamp}
+                  user={user}
+                  userImage={userImage}
+                />
+              );
+            })}
+            <ChatBottom ref={chatRef} />
+          </ChatMessages>
+          <ChatInput
+            chatRef={chatRef}
+            channelName={roomDetails?.data().name}
+            channelId={roomId}
+          />
+        </>
+      )}
     </ChatContainer>
   );
 }
@@ -101,4 +149,4 @@ const ChatContainer = styled.div`
 
 const ChatMessages = styled.div``;
 
-const ChatBottom = styled.div``
+const ChatBottom = styled.div``;

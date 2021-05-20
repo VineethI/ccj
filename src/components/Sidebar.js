@@ -13,7 +13,7 @@ import { auth } from '../firebase'
 function Sidebar() {
     
     const [user] = useAuthState(auth)
-    const [channels, loading, error] = useCollection(db.collection('rooms'))
+    const [channels] = useCollection(db.collection('rooms'))
 
     return (
         <SidebarContainer>
