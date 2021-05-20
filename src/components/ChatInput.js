@@ -3,8 +3,12 @@ import React, {useState} from 'react'
 import styled from 'styled-components'
 import firebase from 'firebase'
 import {db} from '../firebase'
+import {useAuthState} from 'react-firebase-hooks/auth'
+import { auth } from '../firebase'
 
 function ChatInput({chatRef, channelName, channelId}) {
+
+    const [user] = useAuthState(auth)
 
     const [input, setInput] = useState("")
 
@@ -17,8 +21,8 @@ function ChatInput({chatRef, channelName, channelId}) {
         db.collection('rooms').doc(channelId).collection('messages').add({
             message: input,
             timestamp: firebase.firestore.FieldValue.serverTimestamp(),
-            user: 'Vineeth',
-            userImage: ''
+            user: user.displayName,
+            userImage: user.photoURL
         })
 
         chatRef.current.scrollIntoView({
